@@ -1,0 +1,299 @@
+basePath: /
+definitions:
+  userapi.ChangeUserRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+    type: object
+  userapi.ChangeUserResponse:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+    type: object
+  userapi.DeleteUserResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  userapi.GetUserResponse:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: integer
+      last_name:
+        type: string
+    type: object
+  userapi.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  userapi.RefreshTokenResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  userapi.ServerError:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+  userapi.SignInRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        type: string
+    type: object
+  userapi.SignInResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  userapi.SignUpRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  userapi.SignUpResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API Server for Learning Service
+  title: Learning Service
+  version: "1.0"
+paths:
+  /users/me:
+    get:
+      consumes:
+      - application/json
+      description: Get information about current user
+      operationId: get_user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User get successfully
+          schema:
+            $ref: '#/definitions/userapi.GetUserResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user
+      tags:
+      - Users
+  /users/refresh:
+    post:
+      consumes:
+      - application/json
+      description: relogout
+      operationId: refresh_user
+      parameters:
+      - description: User object to create
+        in: body
+        name: '{object}'
+        required: true
+        schema:
+          $ref: '#/definitions/userapi.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Refresh and access token successfully returned
+          schema:
+            $ref: '#/definitions/userapi.RefreshTokenResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      security:
+      - ApiKeyAuth: []
+      summary: Get access token with refresh token
+      tags:
+      - Users
+  /users/signin:
+    post:
+      consumes:
+      - application/json
+      description: SignIn with JSON payload in the request body
+      operationId: signin_user
+      parameters:
+      - description: User object to create
+        in: body
+        name: '{object}'
+        required: true
+        schema:
+          $ref: '#/definitions/userapi.SignInRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/userapi.SignInResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      summary: SignIn
+      tags:
+      - Users
+  /users/signup:
+    post:
+      consumes:
+      - application/json
+      description: SignUp with JSON payload in the request body
+      operationId: signup_user
+      parameters:
+      - description: User object to create
+        in: body
+        name: '{object}'
+        required: true
+        schema:
+          $ref: '#/definitions/userapi.SignUpRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/userapi.SignUpResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      summary: SignUp
+      tags:
+      - Users
+  /users/user:
+    delete:
+      consumes:
+      - application/json
+      description: Delete user
+      operationId: delete_user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/userapi.DeleteUserResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete user
+      tags:
+      - Users
+    put:
+      consumes:
+      - application/json
+      description: Change user informaion in JSON payload in the request body
+      operationId: change_user
+      parameters:
+      - description: User object updated
+        in: body
+        name: '{object}'
+        required: true
+        schema:
+          $ref: '#/definitions/userapi.ChangeUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User created successfully
+          schema:
+            $ref: '#/definitions/userapi.ChangeUserResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      security:
+      - ApiKeyAuth: []
+      summary: Change user
+      tags:
+      - Users
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

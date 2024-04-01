@@ -1,0 +1,13 @@
+{
+  "body": {
+    "content": "ewogICAgImZpcnN0X25hbWUiOiAiQWxlc2tleSIsCiAgICAibGFzdF9uYW1lIjogIlBsYWtvc2giLAogICAgImVtYWlsIjogInBhdi5kZXZlbG9wQHlhbmRleC5ydSIsCiAgICAicGFzc3dvcmQiOiAiSmhTbUtnTFE2Mjc4SVQiCn0=",
+    "file": false,
+    "fileSize": false
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "method": "POST",
+  "title": "CreateUser",
+  "url": "http://localhost:8082/users"
+}

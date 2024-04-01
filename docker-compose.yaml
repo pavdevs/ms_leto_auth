@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: DockerfileGoApp
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_HOST: host.docker.internal
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: LearningTest
+      DATABASE_SSLMODE: disable
+      KAFKA_BROKER: kafka:9092
+    networks:
+      loacalnetwork:
+
+  nginx:
+    build: 
+      context: .
+      dockerfile: DockerfileNginx
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+    networks:
+      loacalnetwork:
+
+networks:
+  loacalnetwork:
+    name: mynetwork
+    external: true
+
+volumes:
+  postgres_data:
+
