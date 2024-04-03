@@ -26,7 +26,7 @@ func main() {
 
 	db, err := prepareDataBase(logger)
 	repContainer := prepareRepositoryContainer(db, logger)
-	server := prepareServer(logger, repContainer)
+	s := prepareServer(logger, repContainer)
 
 	if err != nil {
 		logger.Info(err)
@@ -36,7 +36,7 @@ func main() {
 
 	logger.Info("Start configuration for server")
 
-	if serverErr := server.Start(); serverErr != nil {
+	if serverErr := s.Start(); serverErr != nil {
 		logger.Info(serverErr)
 	}
 

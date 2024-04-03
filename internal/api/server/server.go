@@ -33,13 +33,13 @@ func (s *Server) Start() error {
 
 	s.logger.Info("Preprare router")
 
-	producer, prErr := prepareProducer(s)
+	p, prErr := prepareProducer(s)
 
 	if prErr != nil {
 		s.logger.Info(prErr)
 	}
 
-	consumer, conErr := prepareConsumer(s)
+	c, conErr := prepareConsumer(s)
 
 	if conErr != nil {
 		s.logger.Info(conErr)
@@ -47,12 +47,12 @@ func (s *Server) Start() error {
 
 	ctx := context.Background()
 
-	go consumeMessages(ctx, consumer)
+	go consumeMessages(ctx, c)
 
 	router := mux.NewRouter()
-	userapi := userapi.NewUserHandler(s.repositoryContainer, s.logger, producer)
+	userApi := userapi.NewUserHandler(s.repositoryContainer, s.logger, p)
 
-	userapi.Register(router)
+	userApi.Register(router)
 
 	s.logger.Info("Router register endpoints")
 
