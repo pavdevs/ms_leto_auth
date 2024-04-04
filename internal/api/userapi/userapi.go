@@ -1,6 +1,7 @@
 package userapi
 
 import (
+	"com.pavdevs.learningservice/internal/repositories/blacklistrepository"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -18,25 +19,64 @@ import (
 )
 
 type UserHandler struct {
-	userRepository *userrepository.UserRepository
-	logger         *logrus.Logger
-	producer       *producer.KafkaProducer
+	userRepository  *userrepository.UserRepository
+	blackRepository *blacklistrepository.BlacklistRepository
+	logger          *logrus.Logger
+	producer        *producer.KafkaProducer
 }
 
 func NewUserHandler(repositorycontainer *repositorycontainer.RepositoryContainer, logger *logrus.Logger, producer *producer.KafkaProducer) *UserHandler {
 	return &UserHandler{
-		userRepository: repositorycontainer.UserRepository,
-		logger:         logger,
-		producer:       producer,
+		userRepository:  repositorycontainer.UserRepository,
+		blackRepository: repositorycontainer.BlacklistRepository,
+		logger:          logger,
+		producer:        producer,
 	}
 }
 
 func (uh *UserHandler) Register(router *mux.Router) {
+	router.Use(uh.LoggingMiddleware)
+
 	router.HandleFunc("/users/signin", uh.SignIn).Methods(http.MethodPost)
 	router.HandleFunc("/users/signup", uh.SignUp).Methods(http.MethodPost)
 	router.HandleFunc("/users/me", uh.Get).Methods(http.MethodGet)
 	router.HandleFunc("/users/user", uh.Delete).Methods(http.MethodDelete)
 	router.HandleFunc("/users/refresh", uh.GetAccessWithRefresh).Methods(http.MethodPost)
+	router.HandleFunc("/users/logout", uh.Logout).Methods(http.MethodPost)
+}
+
+func (uh *UserHandler) LoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		uh.logger.Infof("Method: %s, Path: %s\n", r.Method, r.URL.Path)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (uh *UserHandler) authMiddleware(w http.ResponseWriter, r *http.Request) error {
+	var err error
+
+	user, err := uh.getUserFromToken(r)
+
+	if err != nil {
+		encodeErrorResponse(err, w, uh.logger, http.StatusUnauthorized)
+		return err
+	}
+
+	isUserInBlacklist, err := uh.blackRepository.IsUserInBlacklist(user.ID)
+
+	if err != nil {
+		encodeErrorResponse(err, w, uh.logger, http.StatusInternalServerError)
+		return err
+	}
+
+	if isUserInBlacklist {
+		encodeErrorResponse(errors.New("user is blacklisted"), w, uh.logger, http.StatusUnauthorized)
+		return errors.New("user is blacklisted")
+	}
+
+	return nil
 }
 
 // @Summary SignIn
@@ -126,7 +166,6 @@ func (uh *UserHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ServerError "Internal server error"
 // @Router /users/signup [post]
 func (uh *UserHandler) SignUp(w http.ResponseWriter, r *http.Request) {
-
 	var requestUser SignUpRequest
 	decodeErr := json.NewDecoder(r.Body).Decode(&requestUser)
 
@@ -186,6 +225,8 @@ func (uh *UserHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 		uh.logger.Error(sendPrErr)
 	}
 
+	uh.blackRepository.RemoveFromBlacklist(user.ID)
+
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -202,6 +243,10 @@ func (uh *UserHandler) SignUp(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ServerError "Internal server error"
 // @Router /users/me [get]
 func (uh *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
+
+	if authMidErr := uh.authMiddleware(w, r); authMidErr != nil {
+		return
+	}
 
 	user, authErr := uh.checkAuthToken(r)
 
@@ -252,6 +297,10 @@ func (uh *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ServerError "Internal server error"
 // @Router /users/user [put]
 func (uh *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
+
+	if authMidErr := uh.authMiddleware(w, r); authMidErr != nil {
+		return
+	}
 
 	user, authErr := uh.checkAuthToken(r)
 
@@ -316,6 +365,10 @@ func (uh *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Router /users/user [delete]
 func (uh *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
+	if authMidErr := uh.authMiddleware(w, r); authMidErr != nil {
+		return
+	}
+
 	user, authErr := uh.checkAuthToken(r)
 
 	w.Header().Set("Content-Type", "application/json")
@@ -369,14 +422,19 @@ func (uh *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} ServerError "Internal server error"
 // @Router /users/refresh [post]
 func (uh *UserHandler) GetAccessWithRefresh(w http.ResponseWriter, r *http.Request) {
-	var err error
 
-	if err := uh.checkRefreshToken(r); err != nil {
-		encodeErrorResponse(err, w, uh.logger, http.StatusBadRequest)
+	if authMidErr := uh.authMiddleware(w, r); authMidErr != nil {
 		return
 	}
 
-	user, err := uh.checkAuthToken(r)
+	var err error
+
+	if err := uh.checkRefreshToken(r); err != nil {
+		encodeErrorResponse(err, w, uh.logger, http.StatusUnauthorized)
+		return
+	}
+
+	user, err := uh.getUserFromToken(r)
 
 	if err != nil {
 		encodeErrorResponse(err, w, uh.logger, http.StatusBadRequest)
@@ -386,14 +444,14 @@ func (uh *UserHandler) GetAccessWithRefresh(w http.ResponseWriter, r *http.Reque
 	accessToken, err := tokenservice.NewAccessToken(*tokenservice.NewUserClaims(user.ID, user.FirstName, user.LastName, user.Email))
 
 	if err != nil {
-		encodeErrorResponse(err, w, uh.logger, http.StatusBadRequest)
+		encodeErrorResponse(err, w, uh.logger, http.StatusInternalServerError)
 		return
 	}
 
 	refreshToken, err := tokenservice.NewRefreshToken(*tokenservice.NewStandartClaims())
 
 	if err != nil {
-		encodeErrorResponse(err, w, uh.logger, http.StatusBadRequest)
+		encodeErrorResponse(err, w, uh.logger, http.StatusInternalServerError)
 		return
 	}
 
@@ -404,6 +462,43 @@ func (uh *UserHandler) GetAccessWithRefresh(w http.ResponseWriter, r *http.Reque
 
 	if responseEncodingErr := json.NewEncoder(w).Encode(response); responseEncodingErr != nil {
 		encodeErrorResponse(responseEncodingErr, w, uh.logger, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// @Summary Logout from all devices
+// @Security ApiKeyAuth
+// @Tags Users
+// @Description logout
+// @ID logout_user
+// @Accept json
+// @Produce json
+// @Success 200 {object} LogoutUserResponse "Logout successed"
+// @Failure 400 {object} ServerError "Invalid request or JSON format"
+// @Failure 401 {object} ServerError "Unauthorized"
+// @Failure 500 {object} ServerError "Internal server error"
+// @Router /users/logout [post]
+func (uh *UserHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	user, authErr := uh.checkAuthToken(r)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if authErr != nil {
+		encodeErrorResponse(authErr, w, uh.logger, http.StatusUnauthorized)
+		return
+	}
+
+	if logoutErr := uh.blackRepository.AddToBlacklist(user.ID); logoutErr != nil {
+		encodeErrorResponse(logoutErr, w, uh.logger, http.StatusInternalServerError)
+		return
+	}
+
+	response := LogoutUserResponse{Message: "Logout successed"}
+
+	if encErr := json.NewEncoder(w).Encode(response); encErr != nil {
+		encodeErrorResponse(encErr, w, uh.logger, http.StatusInternalServerError)
 		return
 	}
 
@@ -421,10 +516,36 @@ func encodeErrorResponse(
 	logger.Error(err)
 	json.NewEncoder(w).Encode(
 		ServerError{
-			Message: "Something went wrong",
+			Message: err.Error(),
 			Code:    code,
 		},
 	)
+}
+
+func (uh *UserHandler) getUserFromToken(r *http.Request) (*userrepository.User, error) {
+
+	tokenString := r.Header.Get("Authorization")
+	splitToken := strings.Split(tokenString, "Bearer ")
+
+	if len(splitToken) != 2 {
+		return nil, errors.New("invalid token format")
+	}
+
+	reqToken := splitToken[1]
+
+	userClaims, err := tokenservice.GetUserClaimsFromAccessToken(reqToken)
+
+	if err != nil {
+		return nil, errors.New("invalid token format")
+	}
+
+	user, findErr := uh.userRepository.GetUser(userClaims.Email)
+
+	if findErr != nil && user == nil {
+		return nil, errors.New("invalid user in token")
+	}
+
+	return user, nil
 }
 
 func (uh *UserHandler) checkAuthToken(r *http.Request) (*userrepository.User, error) {
@@ -454,14 +575,15 @@ func (uh *UserHandler) checkAuthToken(r *http.Request) (*userrepository.User, er
 }
 
 func (uh *UserHandler) checkRefreshToken(r *http.Request) error {
-	var refreshReuest RefreshTokenRequest
-	decodeErr := json.NewDecoder(r.Body).Decode(&refreshReuest)
+	var refreshRequest RefreshTokenRequest
+
+	decodeErr := json.NewDecoder(r.Body).Decode(&refreshRequest)
 
 	if decodeErr != nil {
 		return errors.New("invalid body")
 	}
 
-	stdClaims, refErr := tokenservice.ParseRefreshToken(refreshReuest.RefreshToken)
+	stdClaims, refErr := tokenservice.ValidateRefreshToken(refreshRequest.RefreshToken)
 
 	if refErr != nil {
 		return errors.New("invalid refresh token format")

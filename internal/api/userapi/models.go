@@ -56,6 +56,10 @@ type RefreshTokenResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type LogoutUserResponse struct {
+	Message string `json:"message"`
+}
+
 type ServerError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	accessExpiresAt   = 1
-	refreshsExpiresAt = 24 * 10
+	accessExpiresAt  = 1
+	refreshExpiresAt = 24 * 10
 )
 
 type UserClaims struct {
@@ -28,7 +28,7 @@ func NewUserClaims(id int, first string, last string, email string) *UserClaims 
 		Email: email,
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  time.Now().Unix(),
-			ExpiresAt: time.Now().Add(time.Minute * accessExpiresAt).Unix(),
+			ExpiresAt: time.Now().Add(time.Hour * accessExpiresAt).Unix(),
 		},
 	}
 }
@@ -36,7 +36,7 @@ func NewUserClaims(id int, first string, last string, email string) *UserClaims 
 func NewStandartClaims() *jwt.StandardClaims {
 	return &jwt.StandardClaims{
 		IssuedAt:  time.Now().Unix(),
-		ExpiresAt: time.Now().Add(time.Hour * refreshsExpiresAt).Unix(),
+		ExpiresAt: time.Now().Add(time.Hour * refreshExpiresAt).Unix(),
 	}
 }
 
@@ -50,6 +50,14 @@ func NewRefreshToken(claims jwt.StandardClaims) (string, error) {
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
 	return refreshToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
+}
+
+func GetUserClaimsFromAccessToken(accessToken string) (*UserClaims, error) {
+	parsedAccessToken, err := jwt.ParseWithClaims(accessToken, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("TOKEN_SECRET")), nil
+	})
+
+	return parsedAccessToken.Claims.(*UserClaims), err
 }
 
 func ParseAccessToken(accessToken string) (*UserClaims, error) {
