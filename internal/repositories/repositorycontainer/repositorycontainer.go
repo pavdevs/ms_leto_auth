@@ -12,9 +12,9 @@ type RepositoryContainer struct {
 
 func NewRepositoryContainer(db *database.Database, logger *logrus.Logger) *RepositoryContainer {
 
-	userrepository := userrepository.NewUserRepository(db, logger)
+	userRepository := userrepository.NewUserRepository(db, logger)
 
 	return &RepositoryContainer{
-		UserRepository: userrepository,
+		UserRepository: userRepository,
 	}
 }

@@ -31,7 +31,7 @@ func NewServer(config Config, logger *logrus.Logger, repositoryContainer *reposi
 
 func (s *Server) Start() error {
 
-	s.logger.Info("Preprare router")
+	s.logger.Info("Prepare router")
 
 	p, prErr := prepareProducer(s)
 
