@@ -38,6 +38,11 @@ definitions:
       last_name:
         type: string
     type: object
+  userapi.LogoutUserResponse:
+    properties:
+      message:
+        type: string
+    type: object
   userapi.RefreshTokenRequest:
     properties:
       refresh_token:
@@ -96,6 +101,36 @@ info:
   title: Learning Service
   version: "1.0"
 paths:
+  /users/logout:
+    post:
+      consumes:
+      - application/json
+      description: logout
+      operationId: logout_user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Logout successed
+          schema:
+            $ref: '#/definitions/userapi.LogoutUserResponse'
+        "400":
+          description: Invalid request or JSON format
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/userapi.ServerError'
+      security:
+      - ApiKeyAuth: []
+      summary: Logout from all devices
+      tags:
+      - Users
   /users/me:
     get:
       consumes:

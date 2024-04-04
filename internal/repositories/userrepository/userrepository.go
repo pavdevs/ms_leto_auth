@@ -3,6 +3,7 @@ package userrepository
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	database "com.pavdevs.learningservice/internal/database"
 	"com.pavdevs.learningservice/internal/services/bcryptservice"
@@ -23,28 +24,22 @@ func NewUserRepository(db *database.Database, logger *logrus.Logger) *UserReposi
 }
 
 func (u *UserRepository) CreateUser(user *User) error {
-	hashedPassword, err := bcryptservice.EncryptPassword(user.Password)
 
+	var err error
+
+	hashedPwd, err := bcryptservice.EncryptPassword(user.Password)
 	if err != nil {
-		u.logger.Error("Ошибка создания хэша пароля", err)
-		return err
+		return fmt.Errorf("error encrypting password: %v", err)
 	}
 
-	u.logger.Info("Хэш пароля: ", string(hashedPassword))
-	u.logger.Info(user)
-
-	if pingErr := u.database.DB.Ping(); pingErr != nil {
-		u.logger.Error("Ошибка пинга базы", pingErr)
-		return pingErr
+	if err = u.database.DB.Ping(); err != nil {
+		return fmt.Errorf("error pinging the database: %v", err)
 	}
 
 	query := "INSERT INTO users (first_name, last_name, email, encrypted_password) VALUES ($1, $2, $3, $4)"
-
-	_, db_err := u.database.DB.Exec(query, user.FirstName, user.LastName, user.Email, hashedPassword)
-
-	if db_err != nil {
-		u.logger.Error("Ошибка создания пользователя", db_err)
-		return db_err
+	_, err = u.database.DB.Exec(query, user.FirstName, user.LastName, user.Email, hashedPwd)
+	if err != nil {
+		return fmt.Errorf("error creating user: %v", err)
 	}
 
 	return nil
@@ -96,7 +91,7 @@ func (u *UserRepository) GetUsers() ([]User, error) {
 	}
 	defer rows.Close()
 
-	users := []User{}
+	var users []User
 	for rows.Next() {
 		user := User{}
 		err := rows.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email)

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	accessExpiresAt   = 1
-	refreshsExpiresAt = 24 * 10
+	accessExpiresAt  = 1
+	refreshExpiresAt = 24 * 10
 )
 
 type UserClaims struct {
@@ -36,7 +36,7 @@ func NewUserClaims(id int, first string, last string, email string) *UserClaims 
 func NewStandartClaims() *jwt.StandardClaims {
 	return &jwt.StandardClaims{
 		IssuedAt:  time.Now().Unix(),
-		ExpiresAt: time.Now().Add(time.Hour * refreshsExpiresAt).Unix(),
+		ExpiresAt: time.Now().Add(time.Hour * refreshExpiresAt).Unix(),
 	}
 }
 
@@ -52,26 +52,34 @@ func NewRefreshToken(claims jwt.StandardClaims) (string, error) {
 	return refreshToken.SignedString([]byte(os.Getenv("TOKEN_SECRET")))
 }
 
+func GetUserClaimsFromAccessToken(accessToken string) (*UserClaims, error) {
+	parsedAccessToken, err := jwt.ParseWithClaims(accessToken, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("TOKEN_SECRET")), nil
+	})
+
+	return parsedAccessToken.Claims.(*UserClaims), err
+}
+
 func ParseAccessToken(accessToken string) (*UserClaims, error) {
 	parsedAccessToken, err := jwt.ParseWithClaims(accessToken, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("TOKEN_SECRET")), nil
 	})
 
-	if err != nil {
+	if claims, ok := parsedAccessToken.Claims.(*UserClaims); ok && parsedAccessToken.Valid {
+		return claims, nil
+	} else {
 		return nil, err
 	}
-
-	return parsedAccessToken.Claims.(*UserClaims), nil
 }
 
-func ParseRefreshToken(refreshToken string) (*jwt.StandardClaims, error) {
-	parsedRefreshToken, err := jwt.ParseWithClaims(refreshToken, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
+func ValidateRefreshToken(tokenString string) (*jwt.StandardClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &jwt.StandardClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("TOKEN_SECRET")), nil
 	})
 
-	if err != nil {
+	if claims, ok := token.Claims.(*jwt.StandardClaims); ok && token.Valid {
+		return claims, nil
+	} else {
 		return nil, err
 	}
-
-	return parsedRefreshToken.Claims.(*jwt.StandardClaims), nil
 }
